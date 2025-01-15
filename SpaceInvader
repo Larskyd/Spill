@@ -1,0 +1,155 @@
+import pygame
+import sys
+
+pygame.init()
+
+# Skjerm
+SKJERM_BREDDE, SKJERM_HOYDE = 800, 600
+skjerm = pygame.display.set_mode((SKJERM_BREDDE, SKJERM_HOYDE))
+pygame.display.set_caption("Romskip")
+
+# Farger
+HVIT = (255, 255, 255)
+SVART = (0, 0, 0)
+GUL = (255, 255, 0)
+GRONN = (0, 255, 0)
+ROD = (255, 0, 0)
+
+# Klokke
+klokke = pygame.time.Clock()
+
+# Font
+font = pygame.font.SysFont(None, 36)
+
+# Spiller
+class Spiller:
+    def __init__(self):
+        self.bredde = 50
+        self.hoyde = 30
+        self.x = SKJERM_BREDDE // 2 - self.bredde // 2
+        self.y = SKJERM_HOYDE - self.hoyde - 10
+        self.hastighet = 5
+
+    def tegn(self, skjerm):
+        pygame.draw.rect(skjerm, HVIT, (self.x, self.y, self.bredde, self.hoyde))
+
+    def beveg(self, tastetrykk):
+        if tastetrykk[pygame.K_LEFT] and self.x > 0:
+            self.x -= self.hastighet
+        if tastetrykk[pygame.K_RIGHT] and self.x < SKJERM_BREDDE - self.bredde:
+            self.x += self.hastighet
+
+# Fiender
+class Fiende:
+    def __init__(self, x, y):
+        self.bredde = 40
+        self.hoyde = 30
+        self.x = x
+        self.y = y
+        self.hastighet = 2
+        self.eksploderer = False
+        self.eksplosjon_tid = 0
+
+    def tegn(self, skjerm):
+        if self.eksploderer:
+            pygame.draw.circle(skjerm, GUL, (self.x + self.bredde // 2, self.y + self.hoyde // 2), 30)
+        else:
+            pygame.draw.rect(skjerm, ROD, (self.x, self.y, self.bredde, self.hoyde))
+
+    def beveg(self):
+        if not self.eksploderer:
+            self.x += self.hastighet
+            if self.x <= 0 or self.x >= SKJERM_BREDDE - self.bredde:
+                self.hastighet *= -1
+                self.y += 20
+
+# Prosjektil
+class Prosjektil:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.bredde = 5
+        self.hoyde = 10
+        self.hastighet = -7
+
+    def tegn(self, skjerm):
+        pygame.draw.rect(skjerm, GRONN, (self.x, self.y, self.bredde, self.hoyde))
+
+    def beveg(self):
+        self.y += self.hastighet
+
+# Kollisjon
+def kollisjon(prosjektil, fiende):
+    return (
+        prosjektil.x < fiende.x + fiende.bredde and
+        prosjektil.x + prosjektil.bredde > fiende.x and
+        prosjektil.y < fiende.y + fiende.hoyde and
+        prosjektil.y + prosjektil.hoyde > fiende.y
+    )
+
+# Hovedfunksjon
+def main():
+    spiller = Spiller()
+    fiender = [Fiende(100 + i * 60, 50) for i in range(5)]
+    prosjektiler = []
+    poeng = 0
+
+    while True:
+        tastetrykk = pygame.key.get_pressed()
+
+        # Håndterer hendelser
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                prosjektiler.append(Prosjektil(spiller.x + spiller.bredde // 2, spiller.y))
+
+        # Bevegelse
+        spiller.beveg(tastetrykk)
+
+        for prosjektil in prosjektiler[:]:
+            prosjektil.beveg()
+            if prosjektil.y < 0:
+                prosjektiler.remove(prosjektil)
+
+        for fiende in fiender[:]:
+            if fiende.eksploderer:
+                fiende.eksplosjon_tid += 1
+                if fiende.eksplosjon_tid > 20:
+                    fiender.remove(fiende)
+                continue
+            fiende.beveg()
+
+        for prosjektil in prosjektiler[:]:
+            for fiende in fiender[:]:
+                if kollisjon(prosjektil, fiende):
+                    fiende.eksploderer = True
+                    prosjektiler.remove(prosjektil)
+                    poeng += 10
+                    break
+
+        # Restart når alle fiender er eliminert
+        if not fiender:
+            fiender = [Fiende(100 + i * 60, 50) for i in range(5)]
+            poeng = 0
+
+        # Tegning
+        skjerm.fill(SVART)
+        spiller.tegn(skjerm)
+        for prosjektil in prosjektiler:
+            prosjektil.tegn(skjerm)
+        for fiende in fiender:
+            fiende.tegn(skjerm)
+
+        # Poengvisning
+        poeng_tekst = font.render(f"Poeng: {poeng}", True, HVIT)
+        skjerm.blit(poeng_tekst, (10, 10))
+
+        # Oppdater skjermen
+        pygame.display.flip()
+        klokke.tick(60)
+
+if __name__ == "__main__":
+    main()
+
